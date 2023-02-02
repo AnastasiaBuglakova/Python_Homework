@@ -1,3 +1,14 @@
+# Стоун, привет
+# Направляю ДЗ, по ссылке Homework_9. Значительных ошибок не нашла, такие правки предлагаю:
+# 1 проверку на введение командой /set число введение значения больше 29, иначе выигрывает первый сделавший ход
+# 2 добавила в каждый вывод перед ходом игрока кол-во оставшихся конфет и сколько взял игрок на предыдущем ходе,
+# если он был
+# 3 проверку на то, чтобы после команды /duel вводился ID
+# 4 добавила в вывод после команды /start условий игры
+# 5 добавила чтобы начальное значение, установленное командой /set число сохранялось в файл и использовалось
+# при начале игры с ботом и в дуэли. Пришлось добавить проверку наличия файла. Если файла нет то значение
+# по умолчанию 150 используется.
+# 6 При игре в дуэль добавила инфо. о том, кто вызывает на дуэль
 import random
 import os.path
 from aiogram import types
@@ -12,14 +23,15 @@ current = 0
 
 @dp.message_handler(commands=['start', 'старт'])
 async def mes_start(message: types.Message):
-    MESSAGE_CANDY_GAME = "Для игры с конфетами человек против бота введи /game.\nУсловия игры: " \
+    MESSAGE_CANDY_GAME = "Для игры с конфетами человек против бота введи /new_game.\nУсловия игры: " \
                          "На столе лежит заданное количество конфет.\n" \
                          "Играют два игрока, делая ход друг после друга. Первый ход определяется случайно. \n" \
                          "За один ход можно забрать не более чем 28 конфет. \n" \
                          "Все конфеты оппонента достаются сделавшему последний ход. \n" \
                          "Можно до начала игры выбрать количество конфет командой /set 000, где 000 - количество конфет цифрами.\n" \
                          "По умолчанию 150. Могу сказать заранее, при любом количестве конфет, если бот ходит первым, шансов у тебя нет)." \
-                         "\nДля игры с оппонентом введи /duel и id оппонента, для игры вдвоем."
+                         "\nДля игры с оппонентом введи /duel и id оппонента, для игры вдвоем.\n" \
+                         "Для остановки игры набери /stop."
 
     name = message.from_user.first_name
     await message.answer(f'{name}, привет!\n{MESSAGE_CANDY_GAME}')
@@ -67,7 +79,8 @@ async def mes_duel(message: types.Message):
     else:
         duel.append(int(message.text.split()[1]))
 
-        # здесь тоже предлагаю считывать из файла сохраненное значение по команде /set. Если файла там нет, то берем max_count
+        # здесь тоже предлагаю считывать из файла сохраненное значение по команде /set.
+        # Если файла там нет, то берем max_count
         if os.path.isfile('count.txt'):
             with open('count.txt', 'r') as data:
                 count = data.read().strip()
@@ -85,6 +98,13 @@ async def mes_duel(message: types.Message):
             await dp.bot.send_message(duel[0], f'Первый ход за твоим противником! На столе {total} конфет. Жди своего хода')
         current = duel[0] if first else duel[1]
         new_game = True
+
+# добавила остановку игры
+@dp.message_handler(commands=['stop'])
+async def mes_stop(message: types.Message):
+    global new_game
+    new_game = False
+    await message.answer(f'Игра остановлена')
 
 
 @dp.message_handler(commands=['set'])
@@ -130,6 +150,8 @@ async def mes_take_candy(message: types.Message):
                     await bot_turn(message)
             else:
                 await message.answer(f'{name}, надо указать ЧИСЛО от 1 до 28!')
+        else:
+            await message.answer(f'{name}, если хочешь начать игру набери /new_game или /duel id')
     else:
         if current == int(message.from_user.id):
             name = message.from_user.first_name
@@ -148,6 +170,11 @@ async def mes_take_candy(message: types.Message):
                         switch_players()
                 else:
                     await message.answer(f'{name}, надо указать ЧИСЛО от 1 до 28!')
+            else:
+                if new_game:
+                    await message.answer(f'Жди хода противника.')
+                else:
+                    await message.answer(f'Игра окончена.')
 
 
 async def bot_turn(message: types.Message):
@@ -161,7 +188,7 @@ async def bot_turn(message: types.Message):
                              f'На столе осталось {total} и бот одержал победу')
         new_game = False
     else:
-        remainder = total%29
+        remainder = total % 29
         bot_take = remainder if remainder != 0 else 28
         total -= bot_take
         await message.answer(f'Бот взял {bot_take} конфет. '
